@@ -9,9 +9,10 @@ src1Str = File.read(ARGV[0])
 src2Str = File.read(ARGV[1])
 
 class Request
-	attr_accessor :protocol, :subdomain, :domain, :resourceURIs, :headers, :postData, :getQueryParams, :getMatrixParams
+	attr_accessor :protocol, :subdomain, :domain, :resourceURIs, :headers, :postData, :getQueryParams, :getMatrixParams, :originalURL
 	def initialize(originalURL="", headers="", postData="")
 		#set up default value
+		@originalURL = originalURL
 		@protocol = ""
 		@subdomain = ""
 		@domain = ""
@@ -87,6 +88,7 @@ class Request
 		rv = 0
 		if (@domain != targetReq.domain) then return 9999 end				#domain doesn't match - impossible for these two requests to match.
 		if (@resourceURIs.join("/") != targetReq.resourceURIs.join("/")) then return 9999 end		#resources doesn't match, means URI doesn't match.
+		
 		if (@subdomain != targetReq.subdomain)
 			#subdomain doesn't match but the rest URI matches sometimes means CDN dynamically allocate different nodes to handle requests.
 			rv+=1
@@ -99,13 +101,16 @@ class Request
 			if (!@getQueryParams.has_key?(k)) then rv+=1 end
 		}
 		#Matrix params
+		
 		@resourceURIs.each{|res|
 			mp1 = @getMatrixParams[res]
 			mp2 = targetReq.getMatrixParams[res]
-			mp1.each{|k|
-				if (!mp2.has_key?(k) || mp2[k] != mp1[k]) then rv+=1 end
+			mp1.each_key{|k|
+				if (!mp2.has_key?(k) || mp2[k] != mp1[k])
+					rv+=1
+				end
 			}
-			mp2.each{|k|
+			mp2.each_key{|k|
 				if (!mp1.has_key?(k)) then rv+=1 end
 			}
 		}
@@ -144,8 +149,8 @@ class Request
 	def generateDiffHTML(target_req)
 		#target_req is already confirmed to be matching this request.
 		rv = ""
-		if (@protocol != target_req.protocol) then rv += "<span style='color:red'>#{CGI::escapeHTML(@protocol)}</span>" else rv += "<span style='color:green'>#{CGI::escapeHTML(@protocol)}</span>" end
-		if (@subdomain != target_req.subdomain) then rv += "<span style='color:red'>#{CGI::escapeHTML(@subdomain)}</span>" else rv += "<span style='color:green'>#{CGI::escapeHTML(@subdomain)}</span>" end
+		if (@protocol != target_req.protocol) then rv += "<span style='color:red'>#{CGI::escapeHTML(@protocol)}</span><span style='color:blue'>[#{CGI::escapeHTML(target_req.protocol)}]</span>" else rv += "<span style='color:green'>#{CGI::escapeHTML(@protocol)}</span>" end
+		if (@subdomain != target_req.subdomain) then rv += "<span style='color:red'>#{CGI::escapeHTML(@subdomain)}</span><span style='color:blue'>[#{CGI::escapeHTML(target_req.subdomain)}]</span>" else rv += "<span style='color:green'>#{CGI::escapeHTML(@subdomain)}</span>" end
 		rv += "<span style='color:green'>#{CGI::escapeHTML(@domain)}</span>"
 		@resourceURIs.each{|res|
 			rv += "<span style='color:green'>/#{CGI::escapeHTML(res)}</span>"
@@ -156,9 +161,13 @@ class Request
 						rv += "<span style='color:red'>"
 						rv += CGI::escapeHTML(k + "=" + @getMatrixParams[res][k] + ";")
 						rv += "</span>"
+						rv += "<span style='color:blue'>[Param_Does_Not_Exist!]</span>"
 					elsif (target_req.getMatrixParams[res][k] != @getMatrixParams[res][k])
 						rv += "<span style='color:green'>#{CGI::escapeHTML(k)}=</span>"
-						rv += "<span style='color:red'>#{CGI::escapeHTML(@getMatrixParams[res][k]+";")}</span>"
+						rv += "<span style='color:red'>#{CGI::escapeHTML(@getMatrixParams[res][k])}</span>"
+						rv += "<span style='color:blue'>["
+						rv += CGI::escapeHTML(target_req.getMatrixParams[res][k])
+						rv += "];</span>"
 					else
 						rv += "<span style='color:green'>"
 						rv += CGI::escapeHTML(k + "=" + @getMatrixParams[res][k] + ";")
@@ -175,9 +184,13 @@ class Request
 					rv += "<span style='color:red'>"
 					rv += CGI::escapeHTML(k + "=" + @getQueryParams[k] + "&")
 					rv += "</span>"
+					rv += "<span style='color:blue'>[Param_Does_Not_Exist!]</span>"
 				elsif (target_req.getQueryParams[k] != @getQueryParams[k])
 					rv += "<span style='color:green'>#{CGI::escapeHTML(k)}=</span>"
-					rv += "<span style='color:red'>#{CGI::escapeHTML(@getQueryParams[k]+"&")}</span>"
+					rv += "<span style='color:red'>#{CGI::escapeHTML(@getQueryParams[k])}</span>"
+					rv += "<span style='color:blue'>["
+					rv += CGI::escapeHTML(target_req.getQueryParams[k])
+					rv += "]#{CGI::escapeHTML('&')}</span>"
 				else
 					rv += "<span style='color:green'>"
 					rv += CGI::escapeHTML(k + "=" + @getQueryParams[k] + "&")
@@ -192,9 +205,11 @@ class Request
 				rv += "<span style='color:red'>"
 				rv += CGI::escapeHTML(k + ": " + @headers[k] + ";")
 				rv += "</span>"
+				rv += "<span style='color:blue'>[Header_Does_Not_Exist!]</span>"
 			elsif (target_req.headers[k] != @headers[k])
 				rv += "<span style='color:green'>#{CGI::escapeHTML(k)}: </span>"
 				rv += "<span style='color:red'>#{CGI::escapeHTML(@headers[k])}</span>"
+				rv += "<span style='color:blue'>[#{CGI::escapeHTML(target_req.headers[k])}]</span>"
 			else
 				rv += "<span style='color:green'>"
 				rv += CGI::escapeHTML(k + ": " + @headers[k] + ";")
@@ -204,6 +219,7 @@ class Request
 		}
 		if (@postData != target_req.postData)
 			rv += "<span style='color:red'>#{CGI::escapeHTML(@postData)}</span>"
+			rv += "<span style='color:blue'>[#{CGI::escapeHTML(target_req.postData)}]</span>"
 		else
 			rv += "<span style='color:green'>#{CGI::escapeHTML(@postData)}</span>"
 		end
@@ -291,12 +307,12 @@ matchedRequests2 = Array.new
 unmatchedRequests = Array.new
 htmlStringOutput = "<html><body>"
 src1ReqArray.each{|req1|
-	match_req = Request.new
+	match_req_i = Request.new
 	min_diff = 9999
-	src2ReqArray.each{|req2|
-		diff = req1.compareDiffScore(req2)
+	src2ReqArray.each_index{|req2_i|
+		diff = req1.compareDiffScore(src2ReqArray[req2_i])
 		if (diff < min_diff)
-			match_req = req2
+			match_req_i = req2_i
 			min_diff = diff
 		end
 	}
@@ -307,11 +323,11 @@ src1ReqArray.each{|req1|
 		htmlStringOutput += "</div><br/>"
 	elsif (min_diff < 9999 && min_diff > 0)
 		matchedRequests1.push(req1)
-		matchedRequests2.push(match_req)
-		src2ReqArray.delete(match_req)
-		htmlStringOutput += "<div>"+req1.generateDiffHTML(match_req)+"</div><br/>"
+		matchedRequests2.push(src2ReqArray[match_req_i])
+		htmlStringOutput += "<div>"+req1.generateDiffHTML(src2ReqArray[match_req_i])+"</div><br/>"
+		src2ReqArray.delete_at(match_req_i)
 	elsif (min_diff==0)
-		src2ReqArray.delete(match_req)
+		src2ReqArray.delete_at(match_req_i)
 		htmlStringOutput += "<div style='color:green'>"
 		htmlStringOutput += req1.to_html
 		htmlStringOutput += "</div><br/>"

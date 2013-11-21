@@ -1,1 +1,1 @@
-exports.testSites = ['http://www.hipmunk.com/'];
+exports.testSites = ['http://www.espn.go.com/'];
