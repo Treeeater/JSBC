@@ -54,6 +54,27 @@ function navigateFirstTab(url){
 		fileNameToStoreTraffic = fileNameToStoreTraffic + "\\" + i.toString() + ".txt";
 	}
 }
+
+function refreshFirstTab(){
+	url = tabs[0].url;
+	console.log(url);
+	trustedDomains.push(getTLDFromURL(url));
+	tabs[0].reload();
+	fileNameToStoreTraffic = rootOutputPath + fileNameSanitize(url);
+	if (!file.exists(fileNameToStoreTraffic)) {
+		file.mkpath(fileNameToStoreTraffic);
+		fileNameToStoreTraffic = fileNameToStoreTraffic + "\\1.txt";
+	}
+	else {
+		var i = 1;
+		while (file.exists(fileNameToStoreTraffic + "\\" + i.toString() + ".txt"))
+		{
+			i++;
+		}
+		fileNameToStoreTraffic = fileNameToStoreTraffic + "\\" + i.toString() + ".txt";
+	}
+}
+
 function deleteCookies()
 {
 	cookieService.removeAll();
@@ -92,5 +113,6 @@ exports.getTLDFromURL = getTLDFromURL;
 exports.closeAllOtherTabs = closeAllOtherTabs;
 exports.closeAllTabs = closeAllTabs;
 exports.navigateFirstTab = navigateFirstTab;
+exports.refreshFirstTab = refreshFirstTab;
 exports.deleteCookies = deleteCookies;
 exports.getTrustedDomains = function(){return trustedDomains;};

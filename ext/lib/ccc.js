@@ -7,9 +7,8 @@ var observerService = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObs
 var testSites = TestSites.testSites;
 var window = Cc["@mozilla.org/appshell/appShellService;1"].getService(Ci.nsIAppShellService).hiddenDOMWindow;
 
-
-observerService.addObserver({
-    observe: function(aSubject, aTopic, aData) {
+var observer = {
+	observe: function(aSubject, aTopic, aData) {
 		if ("http-on-modify-request" == aTopic) {
 			var gchannel = aSubject.QueryInterface(Ci.nsIHttpChannel)
 			var url = gchannel.URI.spec;
@@ -56,8 +55,8 @@ observerService.addObserver({
 				Utils.saveToFile(url+"\r\n"+headers+"\r\n--------------\r\n");
 			}
 		}
-    }
-}, "http-on-modify-request", false);
+	}
+}
 
 /*exports.initTabInfoWorker = function(worker){
 	worker.port.on("DomainReport", function(msg){
@@ -70,5 +69,17 @@ observerService.addObserver({
 	worker.port.emit("reportDomain",{});
 }*/
 Utils.deleteCookies();
-window.setTimeout(Utils.navigateFirstTab.bind(this,testSites[0]),1000);
-window.setTimeout(Utils.closeAllTabs,10000);
+
+exports.navAndRecord = function(site){
+	observerService.addObserver(observer, "http-on-modify-request", false);
+	Utils.navigateFirstTab(site);
+	window.setTimeout(function(){observerService.removeObserver(observer, "http-on-modify-request");},10000);
+}
+
+exports.refreshAndRecord = function(site){
+	observerService.addObserver(observer, "http-on-modify-request", false);
+	Utils.refreshFirstTab();
+	window.setTimeout(function(){observerService.removeObserver(observer, "http-on-modify-request");},10000);
+}
+//window.setTimeout(Utils.navigateFirstTab.bind(this,testSites[0]),1000);
+//window.setTimeout(Utils.closeAllTabs,10000);
