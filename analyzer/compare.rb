@@ -1,7 +1,9 @@
 require 'CGI'
 
-DomainOfInterest = ['google-analytics.com','quantserve.com','scorecardresearch.com','googlesyndication.com','optimizely.com','doubleclick.net','serving-sys.com','doubleverify.com','imrworldwide.com','ooyala.com','voicefive.com','grvcdn','gravity.com','chartbeat.com','chartbeat.net']			#put empty here to make it record every request that's not going to host domain.
+DomainOfInterest = ['google-analytics.com','quantserve.com','scorecardresearch.com','googlesyndication.com','optimizely.com','doubleclick.net','serving-sys.com','doubleverify.com','imrworldwide.com','ooyala.com','voicefive.com','grvcdn','gravity.com','chartbeat.com','chartbeat.net','googleapis.com','google.com','olark.com','adroll.com','googletagservices.com','adnxs.com']			#put empty here to make it record every request that's not going to host domain.
 #DomainOfInterest = []			#put empty here to make it record every request that's not going to host domain.
+
+OnlyDisplayDifferentRequest = true			#Turn on this option and the output HTML file will only contain different/unmatched requests.
 
 if (ARGV.length != 3)
 	p "wrong number of arguments. needs 3: 1st: output HTML file name, 2nd: file1, 3rd: file2"
@@ -334,9 +336,11 @@ src1ReqArray.each{|req1|
 		src2ReqArray.delete_at(match_req_i)
 	elsif (min_diff==0)
 		src2ReqArray.delete_at(match_req_i)
-		htmlStringOutput += "<div style='color:green'>"
-		htmlStringOutput += req1.to_html
-		htmlStringOutput += "</div><br/>"
+		if (!OnlyDisplayDifferentRequest)
+			htmlStringOutput += "<div style='color:green'>"
+			htmlStringOutput += req1.to_html
+			htmlStringOutput += "</div><br/>"
+		end
 		identicalRequests.push(req1)
 	end
 }
