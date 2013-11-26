@@ -79,7 +79,7 @@ exports.navAndRecord = function(site){
 exports.refreshAndRecord = function(site){
 	observerService.addObserver(observer, "http-on-modify-request", false);
 	Utils.refreshFirstTab();
-	window.setTimeout(function(){observerService.removeObserver(observer, "http-on-modify-request");},10000);
+	window.setTimeout(function(){observerService.removeObserver(observer, "http-on-modify-request");console.log('observer removed');},10000);
 }
 //window.setTimeout(Utils.navigateFirstTab.bind(this,testSites[0]),1000);
 //window.setTimeout(Utils.closeAllTabs,10000);

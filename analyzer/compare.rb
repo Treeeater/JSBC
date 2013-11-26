@@ -1,12 +1,16 @@
 require 'CGI'
 
-if (ARGV.length != 2)
-	p "wrong number of arguments. needs 2."
+DomainOfInterest = ['google-analytics.com','quantserve.com','scorecardresearch.com','googlesyndication.com','optimizely.com','doubleclick.net','serving-sys.com','doubleverify.com','imrworldwide.com','ooyala.com','voicefive.com','grvcdn','gravity.com','chartbeat.com','chartbeat.net']			#put empty here to make it record every request that's not going to host domain.
+#DomainOfInterest = []			#put empty here to make it record every request that's not going to host domain.
+
+if (ARGV.length != 3)
+	p "wrong number of arguments. needs 3: 1st: output HTML file name, 2nd: file1, 3rd: file2"
 	exit 
 end
 
-src1Str = File.read(ARGV[0])
-src2Str = File.read(ARGV[1])
+outputHTMLFileName = ARGV[0]
+src1Str = File.read(ARGV[1])
+src2Str = File.read(ARGV[2])
 
 class Request
 	attr_accessor :protocol, :subdomain, :domain, :resourceURIs, :headers, :postData, :getQueryParams, :getMatrixParams, :originalURL
@@ -92,7 +96,7 @@ class Request
 		if (@subdomain != targetReq.subdomain)
 			#subdomain doesn't match but the rest URI matches sometimes means CDN dynamically allocate different nodes to handle requests.
 			rv+=1
-		end				
+		end
 		#Query params
 		@getQueryParams.each_key{|k|
 			if (!targetReq.getQueryParams.has_key?(k) || targetReq.getQueryParams[k] != @getQueryParams[k]) then rv+=1 end
@@ -274,6 +278,7 @@ src1StrArray.each{|str|
 		end
 	}
 	request = Request.new(url,headers,postData)
+	if (!DomainOfInterest.empty? && !DomainOfInterest.include?(request.domain)) then next end
 	src1ReqArray.push(request)
 }
 
@@ -298,6 +303,7 @@ src2StrArray.each{|str|
 		end
 	}
 	request = Request.new(url,headers,postData)
+	if (!DomainOfInterest.empty? && !DomainOfInterest.include?(request.domain)) then next end
 	src2ReqArray.push(request)
 }
 
@@ -346,4 +352,4 @@ File.open("M1.txt","w+"){|f| f.write(matchedRequests1.map{|m| m.serialize}.join(
 File.open("U1.txt","w+"){|f| f.write(unmatchedRequests.map{|m| m.serialize}.join("\n"))}
 File.open("M2.txt","w+"){|f| f.write(matchedRequests2.map{|m| m.serialize}.join("\n"))}
 File.open("U2.txt","w+"){|f| f.write(src2ReqArray.map{|m| m.serialize}.join("\n"))}
-File.open("1.html","w+"){|f| f.write(htmlStringOutput)}
+File.open("#{outputHTMLFileName}.html","w+"){|f| f.write(htmlStringOutput)}

@@ -57,7 +57,6 @@ function navigateFirstTab(url){
 
 function refreshFirstTab(){
 	url = tabs[0].url;
-	console.log(url);
 	trustedDomains.push(getTLDFromURL(url));
 	tabs[0].reload();
 	fileNameToStoreTraffic = rootOutputPath + fileNameSanitize(url);
