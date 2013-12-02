@@ -1,26 +1,26 @@
 require 'CGI'
 
-DomainOfInterest = ['google-analytics.com','quantserve.com','scorecardresearch.com','googlesyndication.com','optimizely.com','doubleclick.net','serving-sys.com','doubleverify.com','imrworldwide.com','ooyala.com','voicefive.com','grvcdn','gravity.com','chartbeat.com','chartbeat.net','googleapis.com','google.com','olark.com','adroll.com','googletagservices.com','adnxs.com']			#put empty here to make it record every request that's not going to host domain.
-#DomainOfInterest = []			#put empty here to make it record every request that's not going to host domain.
+#DomainOfInterest = ['google-analytics.com','quantserve.com','scorecardresearch.com','googlesyndication.com','optimizely.com','doubleclick.net','serving-sys.com','doubleverify.com','imrworldwide.com','ooyala.com','voicefive.com','grvcdn','gravity.com','chartbeat.com','chartbeat.net','googleapis.com','google.com','olark.com','adroll.com','googletagservices.com','adnxs.com','moatads','axf8.net','msn.com','peer39.net','llnwd.net','wsod.com','dl-rms.com','krxd.net','2mdn.net','cxense.com','bluekai.com','twitter.com']			#put empty here to make it record every request that's not going to host domain.
+DomainOfInterest = []			#put empty here to make it record every request that's not going to host domain.
+TrustedDomains = ['akamaihd.net','facebook.com']				#put empty here to make everything untrusted.
 
 OnlyDisplayDifferentRequest = true			#Turn on this option and the output HTML file will only contain different/unmatched requests.
 
-if (ARGV.length != 3)
-	p "wrong number of arguments. needs 3: 1st: output HTML file name, 2nd: file1, 3rd: file2"
+if (ARGV.length != 2)
+	p "wrong number of arguments. needs 2: 1st: folder 1, 2nd: folder 2"
 	exit 
 end
 
-outputHTMLFileName = ARGV[0]
 userATraces = Array.new
 userBTraces = Array.new
 
+Dir.foreach(ARGV[0]) do |item|
+	next if item == '.' or item == '..'
+	userATraces.push(File.read(ARGV[0]+'/'+item))
+end
 Dir.foreach(ARGV[1]) do |item|
 	next if item == '.' or item == '..'
-	userATraces.push(File.read(ARGV[1]+'/'+item))
-end
-Dir.foreach(ARGV[2]) do |item|
-	next if item == '.' or item == '..'
-	userBTraces.push(File.read(ARGV[2]+'/'+item))
+	userBTraces.push(File.read(ARGV[1]+'/'+item))
 end
 
 class Param
@@ -39,7 +39,7 @@ class Param
 end
 
 class Request
-	attr_accessor :protocol, :subdomain, :domain, :resourceURIs, :headers, :postData, :getQueryParams, :getMatrixParams, :originalURL
+	attr_accessor :protocol, :subdomain, :domain, :resourceURIs, :headers, :postData, :getQueryParams, :getMatrixParams, :originalURL, :cookies
 	def initialize(originalURL="", headers="", postData="")
 		#set up default value
 		@originalURL = originalURL
@@ -47,10 +47,23 @@ class Request
 		@subdomain = ""
 		@domain = ""
 		@resourceURIs = Array.new			#order matters
-		@headers = headers
 		@postData = postData
 		@getQueryParams = Hash.new			#Hash inside this Hash. {Resource Name => {parameter name => parameter value}}
 		@getMatrixParams = Hash.new
+		@cookies = Hash.new
+		@headers = (headers == "") ? Hash.new : headers
+		
+		if (@headers["Cookie"] != nil)
+			cookieStr = @headers["Cookie"]
+			#right now let's just separate cookies via ';'
+			cookieStr.split(';').each{|c|
+				if (c.split('=').size==2)
+					n = c.split('=')[0]
+					v = c.split('=')[1]
+					@cookies[n]=v
+				end
+			}
+		end
 		
 		if (originalURL == "")
 			#empty init.
@@ -146,10 +159,18 @@ class Request
 		}
 		#headers
 		@headers.each_key{|k|
+			if (k=="Cookie") then next end		#cookies are handled separately.
 			if (!targetReq.headers.has_key?(k) || targetReq.headers[k] != @headers[k]) then rv+=1 end
 		}
 		targetReq.headers.each_key{|k|
 			if (!@headers.has_key?(k)) then rv+=1 end
+		}
+		#cookies
+		@cookies.each_key{
+			if (!targetReq.cookies.has_key?(k) || targetReq.cookies[k] != @cookies[k]) then rv+=1 end
+		}
+		targetReq.cookies.each_key{|k|
+			if (!@cookies.has_key?(k)) then rv+=1 end
 		}
 		if (@postData != targetReq.postData)
 			rv+=1
@@ -324,6 +345,35 @@ def identifyCommonReq(traceArray,agreeThres)
 					end
 				}
 			}
+			req.headers.each_key{|k|
+				if (k=="Cookie") then next end		#cookies are handled separately.
+				if tempHash[req.getResourceString]["H__"+k] == nil then tempHash[req.getResourceString]["H__"+k] = Hash.new end
+				if (tempHash[req.getResourceString]["H__"+k][req.headers[k]] == nil)
+					tempHash[req.getResourceString]["H__"+k][req.headers[k]] = true
+				else
+					next
+				end
+				if bigHash[req.getResourceString]["H__"+k] == nil then bigHash[req.getResourceString]["H__"+k] = Hash.new end
+				if bigHash[req.getResourceString]["H__"+k][req.headers[k]] == nil
+					bigHash[req.getResourceString]["H__"+k][req.headers[k]] = 1
+				else
+					bigHash[req.getResourceString]["H__"+k][req.headers[k]] += 1
+				end
+			}
+			req.cookies.each_key{|k|
+				if tempHash[req.getResourceString]["C__"+k] == nil then tempHash[req.getResourceString]["C__"+k] = Hash.new end
+				if (tempHash[req.getResourceString]["C__"+k][req.headers[k]] == nil)
+					tempHash[req.getResourceString]["C__"+k][req.headers[k]] = true
+				else
+					next
+				end
+				if bigHash[req.getResourceString]["C__"+k] == nil then bigHash[req.getResourceString]["C__"+k] = Hash.new end
+				if bigHash[req.getResourceString]["C__"+k][req.cookies[k]] == nil
+					bigHash[req.getResourceString]["C__"+k][req.cookies[k]] = 1
+				else
+					bigHash[req.getResourceString]["C__"+k][req.cookies[k]] += 1
+				end
+			}
 			if req.postData!=""
 				if tempHash[req.getResourceString]["POSTData"] == nil then tempHash[req.getResourceString]["POSTData"] = Hash.new end
 				if (tempHash[req.getResourceString]["POSTData"][req.postData] == nil)
@@ -380,6 +430,7 @@ userATraces.each{|tr|
 		}
 		request = Request.new(url,headers,postData)
 		if (!DomainOfInterest.empty? && !DomainOfInterest.include?(request.domain)) then next end
+		if (!TrustedDomains.empty? && TrustedDomains.include?(request.domain)) then next end
 		thisTrace.push(request)
 	}
 	userATraceArray.push(thisTrace)
@@ -410,6 +461,7 @@ userBTraces.each{|tr|
 		}
 		request = Request.new(url,headers,postData)
 		if (!DomainOfInterest.empty? && !DomainOfInterest.include?(request.domain)) then next end
+		if (!TrustedDomains.empty? && TrustedDomains.include?(request.domain)) then next end
 		thisTrace.push(request)
 	}
 	userBTraceArray.push(thisTrace)
@@ -419,14 +471,18 @@ commonReqUserA = identifyCommonReq(userATraceArray,0.9)
 commonReqUserB = identifyCommonReq(userBTraceArray,0.9)
 commonReqUserA.each{|recA|
 	matched = false
+	resourceMatched = false						#if resource URL is matched, but not params, this is still set to true.
 	commonReqUserB.each_index{|recB_i|
 		if (recA.eq(commonReqUserB[recB_i]))
 			deleted = commonReqUserB.delete_at(recB_i)
 			matched = true
 			break
 		end
+		if (recA.res == commonReqUserB[recB_i].res)
+			resourceMatched = true
+		end
 	}
-	if (!matched)
+	if (!matched && resourceMatched)
 		print recA.to_s
 	end
 }

@@ -6,6 +6,23 @@ var TestSites = require('./testSites');
 var observerService = Cc["@mozilla.org/observer-service;1"].getService(Ci.nsIObserverService);
 var testSites = TestSites.testSites;
 var window = Cc["@mozilla.org/appshell/appShellService;1"].getService(Ci.nsIAppShellService).hiddenDOMWindow;
+var observerAttached = false;
+
+function removeObserverIfAttached(){
+	if (observerAttached) {
+		observerService.removeObserver(observer, "http-on-modify-request");
+		console.log('observer removed');
+		observerAttached = false;
+	}
+}
+
+function addObserverIfUnattached(){
+	if (!observerAttached) {
+		observerService.addObserver(observer, "http-on-modify-request", false);
+		console.log('observer attached');
+		observerAttached = true;
+	}
+}
 
 var observer = {
 	observe: function(aSubject, aTopic, aData) {
@@ -77,9 +94,9 @@ exports.navAndRecord = function(site){
 }
 
 exports.refreshAndRecord = function(site){
-	observerService.addObserver(observer, "http-on-modify-request", false);
+	addObserverIfUnattached();
 	Utils.refreshFirstTab();
-	window.setTimeout(function(){observerService.removeObserver(observer, "http-on-modify-request");console.log('observer removed');},10000);
+	window.setTimeout(removeObserverIfAttached,10000);
 }
 //window.setTimeout(Utils.navigateFirstTab.bind(this,testSites[0]),1000);
 //window.setTimeout(Utils.closeAllTabs,10000);
